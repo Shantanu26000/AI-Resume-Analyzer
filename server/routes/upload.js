@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const authMiddleware = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -12,7 +13,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-router.post("/", upload.single("resume"), (req, res) => {
+router.post("/", authMiddleware, upload.single("resume"), (req, res) => {
   res.json({
     message: "Resume Uploaded Successfully",
     file: req.file.filename,

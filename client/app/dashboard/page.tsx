@@ -1,6 +1,27 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
 
 export default function Dashboard() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.push("/login");
+    }
+  }, [router]);
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("analysis");
+
+    router.push("/login");
+  };
+
   return (
     <main className="min-h-screen bg-slate-950 text-white">
 
@@ -10,15 +31,26 @@ export default function Dashboard() {
           Resume<span className="text-cyan-400">IQ</span>
         </h1>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 items-center">
 
           <Link href="/history">
-            <button>History</button>
+            <button className="px-4 py-2 hover:text-cyan-400 transition">
+              History
+            </button>
           </Link>
 
           <Link href="/settings">
-            <button>Settings</button>
+            <button className="px-4 py-2 hover:text-cyan-400 transition">
+              Settings
+            </button>
           </Link>
+
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-400 transition"
+          >
+            Logout
+          </button>
 
         </div>
 
@@ -38,17 +70,23 @@ export default function Dashboard() {
 
           <div className="bg-slate-900 rounded-2xl p-8">
             <h3>ATS Score</h3>
-            <p className="text-5xl font-bold text-green-400 mt-4">92</p>
+            <p className="text-5xl font-bold text-green-400 mt-4">
+              92
+            </p>
           </div>
 
           <div className="bg-slate-900 rounded-2xl p-8">
             <h3>Resumes</h3>
-            <p className="text-5xl font-bold mt-4">18</p>
+            <p className="text-5xl font-bold mt-4">
+              18
+            </p>
           </div>
 
           <div className="bg-slate-900 rounded-2xl p-8">
             <h3>Best Score</h3>
-            <p className="text-5xl font-bold text-cyan-400 mt-4">96</p>
+            <p className="text-5xl font-bold text-cyan-400 mt-4">
+              96
+            </p>
           </div>
 
         </div>
@@ -56,7 +94,7 @@ export default function Dashboard() {
         <div className="mt-12">
 
           <Link href="/upload">
-            <button className="bg-cyan-500 text-black font-bold px-8 py-4 rounded-xl">
+            <button className="bg-cyan-500 text-black font-bold px-8 py-4 rounded-xl hover:bg-cyan-400 transition">
               Upload Resume
             </button>
           </Link>

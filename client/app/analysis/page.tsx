@@ -1,17 +1,29 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 export default function AnalysisPage() {
+  const router = useRouter();
+
   const [result, setResult] = useState<any>(null);
 
   useEffect(() => {
+    // Check login
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    // Get analysis result
     const data = localStorage.getItem("analysis");
 
     if (data) {
       setResult(JSON.parse(data));
     }
-  }, []);
+  }, [router]);
 
   if (!result) {
     return (

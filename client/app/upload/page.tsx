@@ -1,70 +1,183 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
 export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+
   const router = useRouter();
+  useEffect(() => {
+  const token = localStorage.getItem("token");
+
+  if (!token) {
+    router.push("/login");
+  }
+}, [router]);
 
   const handleUpload = async () => {
     if (!file) {
-      alert("Select a PDF first");
+      alert("Please select a PDF resume first");
       return;
     }
 
-    const formData = new FormData();
-    formData.append("resume", file);
+    const token = localStorage.getItem("token");
 
-    // Upload PDF
-    const uploadRes = await fetch("http://localhost:5000/api/upload", {
-      method: "POST",
-      body: formData,
-    });
+    if (!token) {
+      alert("Please login first");
+      router.push("/login");
+      return;
+    }
 
-    const uploadData = await uploadRes.json();
+    try {
+      setLoading(true);
 
-    // Analyze PDF
-    const analyzeRes = await fetch("http://localhost:5000/api/analyze", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        file: uploadData.file,
-      }),
-    });
+      const formData = new FormData();
+      formData.append("resume", file);
 
-    const analysis = await analyzeRes.json();
+      // Upload PDF
+      const uploadRes = await fetch(
+        "http://localhost:5000/api/upload",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+          body: formData,
+        }
+      );
 
-    localStorage.setItem("analysis", JSON.stringify(analysis));
+      const uploadData = await uploadRes.json();
 
-    router.push("/analysis");
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.message || "Upload failed");
+      }
+
+      // Analyze PDF
+      const analyzeRes = await fetch(
+        "http://localhost:5000/api/analyze",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            file: uploadData.file,
+          }),
+        }
+      );
+
+      const analysis = await analyzeRes.json();
+
+      if (!analyzeRes.ok) {
+        throw new Error(analysis.message || "Analysis failed");
+      }
+
+      localStorage.setItem(
+        "analysis",
+        JSON.stringify(analysis)
+      );
+
+      router.push("/analysis");
+
+    } catch (error: any) {
+      alert(error.message || "Something went wrong");
+      setLoading(false);
+    }
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center">
-      <div className="bg-slate-900 p-10 rounded-3xl w-full max-w-xl">
+    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
+
+      <div className="bg-slate-900 p-10 rounded-3xl w-full max-w-xl shadow-2xl">
 
         <h1 className="text-3xl font-bold text-center">
           Upload Resume
         </h1>
 
-        <input
-          type="file"
-          accept=".pdf"
-          className="mt-10 w-full"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-        />
+        <p className="text-center text-slate-400 mt-2">
+          Upload your PDF and let AI analyze your resume
+        </p>
 
+        {/* File Selection */}
+        <div className="mt-10">
+
+          <label
+            htmlFor="resume-upload"
+            className="block w-full cursor-pointer rounded-2xl border-2 border-dashed border-slate-600 bg-slate-800 p-8 text-center hover:border-cyan-400 hover:bg-slate-750 transition-all duration-200"
+          >
+
+            <p className="text-lg font-semibold">
+              Select your resume
+            </p>
+
+            <p className="text-slate-400 mt-2">
+              PDF files only
+            </p>
+
+            <span className="inline-block mt-5 bg-cyan-500 text-black px-6 py-3 rounded-xl font-bold hover:bg-cyan-400 transition">
+              Browse from PC
+            </span>
+
+            <input
+              id="resume-upload"
+              type="file"
+              accept=".pdf,application/pdf"
+              className="hidden"
+              onChange={(e) =>
+                setFile(e.target.files?.[0] || null)
+              }
+            />
+
+          </label>
+
+          {file && (
+            <div className="mt-4 bg-slate-800 rounded-xl p-4 text-center">
+              <p className="text-green-400 font-semibold">
+                ✓ Resume selected
+              </p>
+
+              <p className="text-slate-300 text-sm mt-1 break-all">
+                {file.name}
+              </p>
+            </div>
+          )}
+
+        </div>
+
+        {/* Upload & Analyze Button */}
         <button
+          type="button"
           onClick={handleUpload}
-          className="mt-8 w-full bg-cyan-500 text-black py-3 rounded-xl font-bold"
+          disabled={loading}
+          className={`mt-8 w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
+            ${
+              loading
+                ? "bg-slate-600 text-slate-300 cursor-not-allowed"
+                : "bg-cyan-500 text-black hover:bg-cyan-400 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            }
+          `}
         >
-          Upload & Analyze
+          {loading ? (
+            <span className="flex items-center justify-center gap-3">
+              <span className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></span>
+              Analyzing Resume...
+            </span>
+          ) : (
+            "Upload & Analyze"
+          )}
         </button>
 
+        {loading && (
+          <p className="text-center text-slate-400 text-sm mt-4">
+            Uploading your resume and generating AI analysis. Please wait...
+          </p>
+        )}
+
       </div>
+
     </main>
   );
 }
