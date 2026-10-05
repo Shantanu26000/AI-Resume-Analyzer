@@ -22,6 +22,16 @@ export default function UploadPage() {
       return;
     }
 
+    if (file.type !== "application/pdf") {
+  alert("Only PDF files are allowed");
+  return;
+}
+
+if (file.size > 5 * 1024 * 1024) {
+  alert("File too large. Maximum size is 5 MB");
+  return;
+}
+
     const token = localStorage.getItem("token");
 
     if (!token) {
@@ -50,9 +60,16 @@ export default function UploadPage() {
 
       const uploadData = await uploadRes.json();
 
-      if (!uploadRes.ok) {
-        throw new Error(uploadData.message || "Upload failed");
-      }
+if (!uploadRes.ok) {
+  if (uploadRes.status === 401) {
+    localStorage.removeItem("token");
+    alert("Session expired. Please login again.");
+    router.push("/login");
+    return;
+  }
+
+  throw new Error(uploadData.message || "Upload failed");
+}
 
       // Analyze PDF
       const analyzeRes = await fetch(
@@ -71,16 +88,28 @@ export default function UploadPage() {
 
       const analysis = await analyzeRes.json();
 
-      if (!analyzeRes.ok) {
-        throw new Error(analysis.message || "Analysis failed");
-      }
+if (!analyzeRes.ok) {
+  if (analyzeRes.status === 401) {
+    localStorage.removeItem("token");
+    alert("Session expired. Please login again.");
+    router.push("/login");
+    return;
+  }
 
-      localStorage.setItem(
-        "analysis",
-        JSON.stringify(analysis)
-      );
+  throw new Error(analysis.message || "Analysis failed");
+}
 
-      router.push("/analysis");
+    localStorage.setItem(
+  "analysis",
+  JSON.stringify(analysis)
+);
+
+localStorage.setItem(
+  "resumeFile",
+  uploadData.file
+);
+
+router.push("/analysis");
 
     } catch (error: any) {
       alert(error.message || "Something went wrong");

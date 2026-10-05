@@ -32,6 +32,11 @@ export default function Dashboard() {
         </h1>
 
         <div className="flex gap-4 items-center">
+          <Link href="/job-match">
+  <button className="px-4 py-2 hover:text-cyan-400 transition">
+    Job Match
+  </button>
+</Link>
 
           <Link href="/history">
             <button className="px-4 py-2 hover:text-cyan-400 transition">

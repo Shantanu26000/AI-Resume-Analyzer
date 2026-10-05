@@ -19,8 +19,14 @@ Return ONLY valid JSON.
 
 {
   "atsScore": number,
-  "missingSkills":["skill1","skill2","skill3"],
-  "suggestions":[
+"scoreBreakdown": {
+  "keywords": number,
+  "skills": number,
+  "formatting": number,
+  "experience": number
+},
+"missingSkills":["skill1","skill2","skill3"],
+"suggestions":[
     "suggestion1",
     "suggestion2",
     "suggestion3"
