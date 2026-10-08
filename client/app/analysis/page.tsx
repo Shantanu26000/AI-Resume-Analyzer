@@ -17,8 +17,8 @@ export default function AnalysisPage() {
   const router = useRouter();
 
   const [result, setResult] = useState<any>(null);
-
-  useEffect(() => {
+useEffect(() => {
+  const fetchAnalysis = async () => {
     const token = localStorage.getItem("token");
 
     if (!token) {
@@ -26,12 +26,52 @@ export default function AnalysisPage() {
       return;
     }
 
-    const data = localStorage.getItem("analysis");
+    const selectedId = localStorage.getItem("selectedAnalysisId");
 
-    if (data) {
-      setResult(JSON.parse(data));
+    try {
+      // If user selected an old analysis from History
+      if (selectedId) {
+        const response = await fetch(
+          `http://localhost:5000/api/analysis/${selectedId}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.message || "Failed to load analysis"
+          );
+        }
+
+        setResult({
+          atsScore: data.atsScore,
+          scoreBreakdown: data.scoreBreakdown,
+          missingSkills: data.missingSkills,
+          suggestions: data.suggestions,
+        });
+
+        return;
+      }
+
+      // Otherwise load the latest analysis from localStorage
+      const data = localStorage.getItem("analysis");
+
+      if (data) {
+        setResult(JSON.parse(data));
+      }
+    } catch (error: any) {
+      alert(error.message || "Failed to load analysis");
     }
-  }, [router]);
+  };
+
+  fetchAnalysis();
+}, [router]);
 
   if (!result) {
     return (

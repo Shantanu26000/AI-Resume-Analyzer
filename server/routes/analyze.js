@@ -1,3 +1,4 @@
+const db = require("../db");
 const analyzeResume = require("../gemini");
 const express = require("express");
 const fs = require("fs");
@@ -21,7 +22,36 @@ router.post("/", authMiddleware, async (req, res) => {
       .replace(/```/g, "")
       .trim();
 
-    res.json(JSON.parse(cleaned));
+  const analysis = JSON.parse(cleaned);
+
+const sql = `
+  INSERT INTO resume_analyses
+  (user_id, resume_file, ats_score, score_breakdown, missing_skills, suggestions)
+  VALUES (?, ?, ?, ?, ?, ?)
+`;
+
+db.query(
+  sql,
+  [
+    req.user.id,
+    req.body.file,
+    analysis.atsScore,
+    JSON.stringify(analysis.scoreBreakdown),
+    JSON.stringify(analysis.missingSkills),
+    JSON.stringify(analysis.suggestions),
+  ],
+  (err) => {
+    if (err) {
+      console.error("Failed to save analysis:", err);
+
+      return res.status(500).json({
+        message: "Analysis generated but failed to save it",
+      });
+    }
+
+    res.json(analysis);
+  }
+);
 
   } catch (err) {
     res.status(500).json({

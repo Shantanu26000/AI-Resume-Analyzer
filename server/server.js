@@ -1,6 +1,7 @@
 const analyzeRoutes = require("./routes/analyze");
 const uploadRoutes = require("./routes/upload");
 const jobMatchRoutes = require("./routes/jobMatch");
+const analysisRoutes = require("./routes/analysis");
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
@@ -17,6 +18,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
 app.use("/api/analyze", analyzeRoutes);
 app.use("/api/job-match", jobMatchRoutes);
+app.use("/api/analysis", analysisRoutes);
 
 app.get("/", (req, res) => {
   res.json({ message: "ResumeIQ Backend Running 🚀" });

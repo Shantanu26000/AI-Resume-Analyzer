@@ -99,10 +99,12 @@ if (!analyzeRes.ok) {
   throw new Error(analysis.message || "Analysis failed");
 }
 
-    localStorage.setItem(
+localStorage.setItem(
   "analysis",
   JSON.stringify(analysis)
 );
+
+localStorage.removeItem("selectedAnalysisId");
 
 localStorage.setItem(
   "resumeFile",
