@@ -144,4 +144,35 @@ router.get("/:id", authMiddleware, (req, res) => {
   );
 });
 
+router.delete("/:id", authMiddleware, (req, res) => {
+  const sql = `
+    DELETE FROM resume_analyses
+    WHERE id = ? AND user_id = ?
+  `;
+
+  db.query(
+    sql,
+    [req.params.id, req.user.id],
+    (err, result) => {
+      if (err) {
+        console.error("Database Error:", err);
+
+        return res.status(500).json({
+          message: "Failed to delete analysis",
+        });
+      }
+
+      if (result.affectedRows === 0) {
+        return res.status(404).json({
+          message: "Analysis not found",
+        });
+      }
+
+      res.json({
+        message: "Analysis deleted successfully",
+      });
+    }
+  );
+});
+
 module.exports = router;
