@@ -28,7 +28,7 @@ export default function SettingsPage() {
       }
 
       try {
-        const response = await fetch("http://localhost:5000/api/profile", {
+        const response = await fetch("process.env.NEXT_PUBLIC_API_URL/api/profile", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -75,7 +75,7 @@ export default function SettingsPage() {
     try {
       setSaving(true);
 
-      const response = await fetch("http://localhost:5000/api/profile", {
+      const response = await fetch("process.env.NEXT_PUBLIC_API_URL/api/profile", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

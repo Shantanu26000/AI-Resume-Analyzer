@@ -81,7 +81,7 @@ export default function JobMatchPage() {
       setLoading(true);
 
       const response = await fetch(
-        "http://localhost:5000/api/job-match",
+        "process.env.NEXT_PUBLIC_API_URL/api/job-match",
         {
           method: "POST",
           headers: {

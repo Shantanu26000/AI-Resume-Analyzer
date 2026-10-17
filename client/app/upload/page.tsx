@@ -48,7 +48,7 @@ if (file.size > 5 * 1024 * 1024) {
 
       // Upload PDF
       const uploadRes = await fetch(
-        "http://localhost:5000/api/upload",
+        "process.env.NEXT_PUBLIC_API_URL/api/upload",
         {
           method: "POST",
           headers: {
@@ -73,7 +73,7 @@ if (!uploadRes.ok) {
 
       // Analyze PDF
       const analyzeRes = await fetch(
-        "http://localhost:5000/api/analyze",
+        "process.env.NEXT_PUBLIC_API_URL/api/analyze",
         {
           method: "POST",
           headers: {

@@ -25,7 +25,7 @@ export default function HistoryPage() {
       }
 
       try {
-        const response = await fetch("http://localhost:5000/api/analysis", {
+        const response = await fetch("process.env.NEXT_PUBLIC_API_URL/api/analysis", {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -68,7 +68,7 @@ export default function HistoryPage() {
       setDeletingId(id);
 
       const response = await fetch(
-        `http://localhost:5000/api/analysis/${id}`,
+        `process.env.NEXT_PUBLIC_API_URL/api/analysis/${id}`,
         {
           method: "DELETE",
           headers: {

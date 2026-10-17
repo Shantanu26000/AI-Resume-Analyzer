@@ -88,7 +88,7 @@ Start the backend using the script defined in `server/package.json`, and start t
 The development servers have been configured to run at:
 
 - Frontend: `http://localhost:3000`
-- Backend: `http://localhost:5000`
+- Backend: `process.env.NEXT_PUBLIC_API_URL`
 
 ## Security
 
