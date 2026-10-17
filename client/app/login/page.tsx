@@ -3,83 +3,191 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { motion, useReducedMotion } from "framer-motion";
 
 export default function LoginPage() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    const res = await fetch("http://localhost:5000/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password,
-      }),
-    });
+    if (loading) return;
 
-    const data = await res.json();
+    setLoading(true);
 
-    if (res.ok) {
-      localStorage.setItem("token", data.token);
-      alert("Login Successful");
-      router.push("/dashboard");
-    } else {
-      alert(data.message);
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        localStorage.setItem("token", data.token);
+        alert("Login Successful");
+        router.push("/dashboard");
+      } else {
+        alert(data.message || "Login failed");
+      }
+    } catch {
+      alert("Unable to connect to the server. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
+  const entrance = {
+    hidden: { opacity: 0, y: reduceMotion ? 0 : 20 },
+    visible: { opacity: 1, y: 0 },
+  };
+
   return (
-    <main className="min-h-screen bg-slate-950 flex items-center justify-center text-white">
-      <div className="w-full max-w-md bg-slate-900 p-8 rounded-3xl shadow-xl">
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-950 px-4 text-white">
+      {/* Animated background glow */}
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute -left-32 -top-32 h-96 w-96 rounded-full bg-cyan-500/10 blur-3xl"
+        animate={
+          reduceMotion
+            ? {}
+            : { x: [0, 35, 0], y: [0, 25, 0], scale: [1, 1.15, 1] }
+        }
+        transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+      />
 
-        <h1 className="text-4xl font-bold text-center">
-          Resume<span className="text-cyan-400">IQ</span>
-        </h1>
+      <motion.div
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-blue-600/10 blur-3xl"
+        animate={
+          reduceMotion
+            ? {}
+            : { x: [0, -30, 0], y: [0, -20, 0], scale: [1, 1.1, 1] }
+        }
+        transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+      />
 
-        <p className="text-center text-slate-400 mt-2">
-          Login to your account
-        </p>
-
-        <div className="mt-8 space-y-5">
-
-          <input
-            type="email"
-            placeholder="Email"
-            className="w-full p-3 rounded-xl bg-slate-800"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-
-          <input
-            type="password"
-            placeholder="Password"
-            className="w-full p-3 rounded-xl bg-slate-800"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-
-          <button
-            onClick={handleLogin}
-            className="w-full bg-cyan-500 text-black font-bold rounded-xl py-3"
+      <motion.div
+        variants={entrance}
+        initial="hidden"
+        animate="visible"
+        transition={{
+          duration: reduceMotion ? 0 : 0.65,
+          ease: "easeOut",
+        }}
+        className="relative w-full max-w-md"
+      >
+        <motion.div
+          whileHover={reduceMotion ? {} : { y: -3 }}
+          transition={{ duration: 0.25 }}
+          className="rounded-3xl border border-white/10 bg-slate-900/90 p-8 shadow-2xl shadow-cyan-950/20 backdrop-blur-xl sm:p-10"
+        >
+          <motion.h1
+            initial={{ opacity: 0, scale: reduceMotion ? 1 : 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: reduceMotion ? 0 : 0.15, duration: 0.4 }}
+            className="text-center text-4xl font-bold tracking-tight"
           >
-            Login
-          </button>
+            Resume<span className="text-cyan-400">IQ</span>
+          </motion.h1>
 
-          <p className="text-center text-slate-400">
-            Don't have an account?
-            <Link href="/register">
-              <span className="text-cyan-400 ml-2">Register</span>
-            </Link>
+          <p className="mt-2 text-center text-slate-400">
+            Login to your account
           </p>
 
-        </div>
+          <form
+            className="mt-8 space-y-5"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleLogin();
+            }}
+          >
+            <motion.div
+              initial={{ opacity: 0, x: reduceMotion ? 0 : -12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: reduceMotion ? 0 : 0.2 }}
+            >
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm font-medium text-slate-300"
+              >
+                Email address
+              </label>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                autoComplete="email"
+                required
+                className="w-full rounded-xl border border-slate-700 bg-slate-800/80 p-3.5 outline-none transition duration-300 placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </motion.div>
 
-      </div>
+            <motion.div
+              initial={{ opacity: 0, x: reduceMotion ? 0 : 12 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: reduceMotion ? 0 : 0.3 }}
+            >
+              <label
+                htmlFor="password"
+                className="mb-2 block text-sm font-medium text-slate-300"
+              >
+                Password
+              </label>
+              <input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                autoComplete="current-password"
+                required
+                className="w-full rounded-xl border border-slate-700 bg-slate-800/80 p-3.5 outline-none transition duration-300 placeholder:text-slate-500 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </motion.div>
+
+            <motion.button
+              type="submit"
+              disabled={loading}
+              whileHover={
+                reduceMotion || loading ? {} : { scale: 1.02, y: -2 }
+              }
+              whileTap={reduceMotion || loading ? {} : { scale: 0.97 }}
+              className="w-full rounded-xl bg-cyan-400 py-3.5 font-bold text-slate-950 shadow-lg shadow-cyan-500/20 transition-colors duration-300 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loading ? "Logging in..." : "Login"}
+            </motion.button>
+          </form>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: reduceMotion ? 0 : 0.45 }}
+            className="mt-6 text-center text-sm text-slate-400"
+          >
+            Don't have an account?
+            <Link
+              href="/register"
+              className="ml-2 font-semibold text-cyan-400 transition-colors hover:text-cyan-300"
+            >
+              <motion.span
+                whileHover={reduceMotion ? {} : { scale: 1.05 }}
+                className="inline-block"
+              >
+                Register
+              </motion.span>
+            </Link>
+          </motion.p>
+        </motion.div>
+      </motion.div>
     </main>
   );
 }

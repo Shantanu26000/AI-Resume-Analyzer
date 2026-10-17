@@ -1,9 +1,16 @@
 
 "use client";
+
 import AuthGuard from "../../components/AuthGuard";
+import PageTransition from "../../components/PageTransition";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  motion,
+  useReducedMotion,
+  Variants,
+} from "framer-motion";
 
 interface Analysis {
   id: number;
@@ -14,45 +21,60 @@ interface Analysis {
 
 export default function Dashboard() {
   const router = useRouter();
+  const reduceMotion = useReducedMotion();
 
   const [history, setHistory] = useState<Analysis[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [userName, setUserName] = useState("");
+
+  const cardVariants: Variants = {
+    hidden: { opacity: 0, y: reduceMotion ? 0 : 20 },
+    visible: { opacity: 1, y: 0 },
+  };
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       const token = localStorage.getItem("token");
 
       if (!token) {
-        router.push("/login");
+        router.replace("/login");
         return;
       }
 
       try {
-        const response = await fetch(
-          "http://localhost:5000/api/analysis",
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const [analysisResponse, profileResponse] = await Promise.all([
+          fetch("http://localhost:5000/api/analysis", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+          fetch("http://localhost:5000/api/profile", {
+            headers: { Authorization: `Bearer ${token}` },
+          }),
+        ]);
 
-        const data = await response.json();
-
-        if (response.status === 401) {
+        if (
+          analysisResponse.status === 401 ||
+          profileResponse.status === 401
+        ) {
           localStorage.removeItem("token");
-          router.push("/login");
+          router.replace("/login");
           return;
         }
 
-        if (!response.ok) {
+        const analysisData = await analysisResponse.json();
+
+        if (!analysisResponse.ok) {
           throw new Error(
-            data.message || "Failed to load dashboard data"
+            analysisData.message || "Failed to load dashboard data"
           );
         }
 
-        setHistory(data);
+        setHistory(analysisData);
+
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          setUserName(profileData.name || "");
+        }
       } catch (err) {
         setError(
           err instanceof Error
@@ -89,153 +111,226 @@ export default function Dashboard() {
     router.push("/login");
   };
 
+  const stats = [
+    {
+      title: "Latest ATS Score",
+      value: latestScore,
+      color: "text-green-400",
+      description: "Score from your most recent saved analysis",
+    },
+    {
+      title: "Total Analyses",
+      value: totalResumes,
+      color: "text-white",
+      description: "Saved resume analyses in your account",
+    },
+    {
+      title: "Best ATS Score",
+      value: bestScore,
+      color: "text-cyan-400",
+      description: "Your highest saved ATS score",
+    },
+  ];
+
   return (
-      <AuthGuard>
-    <main className="min-h-screen bg-slate-950 text-white">
-      <nav className="flex flex-wrap justify-between items-center gap-4 px-6 sm:px-10 py-6 border-b border-slate-800">
-        <Link href="/dashboard" className="text-3xl font-bold">
-          Resume<span className="text-cyan-400">IQ</span>
-        </Link>
+    <AuthGuard>
+      <PageTransition>
+        <main className="relative min-h-screen overflow-hidden bg-slate-950 text-white">
+          {/* Background glow */}
+          <div className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="absolute -top-40 left-1/4 h-96 w-96 rounded-full bg-cyan-500/[0.07] blur-[100px]" />
+            <div className="absolute right-0 top-1/3 h-80 w-80 rounded-full bg-blue-600/[0.06] blur-[100px]" />
+          </div>
 
-        <div className="flex flex-wrap gap-3 items-center">
-          <Link
-            href="/job-match"
-            className="px-3 py-2 hover:text-cyan-400 transition"
-          >
-            Job Match
-          </Link>
-
-          <Link
-            href="/history"
-            className="px-3 py-2 hover:text-cyan-400 transition"
-          >
-            History
-          </Link>
-
-          <Link
-            href="/settings"
-            className="px-3 py-2 hover:text-cyan-400 transition"
-          >
-            Settings
-          </Link>
-
-          <button
-            onClick={handleLogout}
-            className="bg-red-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-red-400 transition"
-          >
-            Logout
-          </button>
-        </div>
-      </nav>
-
-      <div className="max-w-7xl mx-auto p-6 sm:p-10">
-        <h1 className="text-4xl sm:text-5xl font-bold">
-          Welcome Back 👋
-        </h1>
-
-        <p className="text-slate-400 mt-3">
-          Track your resume performance with AI-powered insights.
-        </p>
-
-        {error && (
-          <div className="mt-8 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-red-300">
-            {error}
-            <button
-              onClick={() => window.location.reload()}
-              className="ml-3 underline font-semibold"
+          <nav className="relative z-10 flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 px-6 py-6 sm:px-10">
+            <Link
+              href="/dashboard"
+              className="text-3xl font-bold tracking-tight"
             >
-              Retry
-            </button>
+              Resume<span className="text-cyan-400">IQ</span>
+            </Link>
+
+            <div className="flex flex-wrap items-center gap-3">
+             
+<motion.div
+  whileHover={reduceMotion ? {} : { y: -3, scale: 1.04 }}
+  whileTap={reduceMotion ? {} : { scale: 0.96 }}
+>
+  <Link
+    href="/job-match"
+    className="block rounded-lg border border-transparent px-4 py-2 transition-colors duration-300 hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
+  >
+    Job Match
+  </Link>
+</motion.div>
+
+<motion.div
+  whileHover={reduceMotion ? {} : { y: -3, scale: 1.04 }}
+  whileTap={reduceMotion ? {} : { scale: 0.96 }}
+>
+  <Link
+    href="/history"
+    className="block rounded-lg border border-transparent px-4 py-2 transition-colors duration-300 hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
+  >
+    History
+  </Link>
+</motion.div>
+
+<motion.div
+  whileHover={reduceMotion ? {} : { y: -3, scale: 1.04 }}
+  whileTap={reduceMotion ? {} : { scale: 0.96 }}
+>
+  <Link
+    href="/settings"
+    className="block rounded-lg border border-transparent px-4 py-2 transition-colors duration-300 hover:border-cyan-400/30 hover:bg-cyan-400/10 hover:text-cyan-300"
+  >
+    Settings
+  </Link>
+</motion.div>
+
+
+              <motion.button
+                whileHover={reduceMotion ? {} : { scale: 1.04 }}
+                whileTap={reduceMotion ? {} : { scale: 0.96 }}
+                onClick={handleLogout}
+                className="rounded-lg bg-red-500 px-4 py-2 font-semibold text-white transition hover:bg-red-400"
+              >
+                Logout
+              </motion.button>
+            </div>
+          </nav>
+
+          <div className="relative z-10 mx-auto max-w-7xl p-6 sm:p-10">
+            <motion.div
+              initial={{ opacity: 0, y: reduceMotion ? 0 : 18 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+            >
+              <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-cyan-400">
+                Your personal workspace
+              </p>
+
+              <h1 className="text-4xl font-extrabold tracking-tight sm:text-5xl">
+                Welcome back{userName ? `, ${userName}` : ""}!{" "}
+                <motion.span
+                  className="inline-block"
+                  animate={reduceMotion ? {} : { rotate: [0, 18, -8, 18, 0] }}
+                  transition={{
+                    duration: 1.2,
+                    delay: 0.5,
+                    repeat: reduceMotion ? 0 : 1,
+                  }}
+                >
+                  👋
+                </motion.span>
+              </h1>
+
+              <p className="mt-3 text-slate-400">
+                Track your resume performance with AI-powered insights.
+              </p>
+            </motion.div>
+
+            {error && (
+              <div className="mt-8 rounded-xl border border-red-400/30 bg-red-400/10 p-4 text-red-300">
+                {error}
+                <button
+                  onClick={() => window.location.reload()}
+                  className="ml-3 font-semibold underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            <motion.div
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: {},
+                visible: {
+                  transition: {
+                    staggerChildren: reduceMotion ? 0 : 0.13,
+                    delayChildren: 0.2,
+                  },
+                },
+              }}
+              className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+            >
+              {stats.map((stat) => (
+                <motion.div
+                  key={stat.title}
+                  variants={cardVariants}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  whileHover={reduceMotion ? {} : { y: -6, scale: 1.01 }}
+                  className="rounded-2xl border border-slate-800 bg-slate-900/80 p-8 shadow-lg shadow-black/10 transition-colors hover:border-cyan-400/30"
+                >
+                  <p className="font-medium text-slate-300">
+                    {stat.title}
+                  </p>
+
+                  <p className={`mt-4 text-5xl font-bold ${stat.color}`}>
+                    {loading ? "..." : stat.value ?? "—"}
+                    {!loading && stat.value !== null && (
+                      <span className="text-lg text-slate-500"> /100</span>
+                    )}
+                  </p>
+
+                  <p className="mt-3 text-sm text-slate-500">
+                    {stat.description}
+                  </p>
+                </motion.div>
+              ))}
+            </motion.div>
+
+            {!loading && !error && totalResumes === 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: reduceMotion ? 0 : 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/80 p-6"
+              >
+                <h2 className="text-xl font-bold">
+                  Start your first analysis
+                </h2>
+                <p className="mt-2 text-slate-400">
+                  Your dashboard statistics will update after you analyze
+                  and save your first resume.
+                </p>
+              </motion.div>
+            )}
+
+            <motion.div
+              initial={{ opacity: 0, y: reduceMotion ? 0 : 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.45, duration: 0.5 }}
+              className="mt-10 flex flex-wrap gap-4"
+            >
+              <motion.div
+                whileHover={reduceMotion ? {} : { y: -3 }}
+                whileTap={reduceMotion ? {} : { scale: 0.97 }}
+              >
+                <Link
+                  href="/upload"
+                  className="inline-flex rounded-xl bg-cyan-400 px-8 py-4 font-bold text-slate-950 transition hover:bg-cyan-300"
+                >
+                  Upload Resume →
+                </Link>
+              </motion.div>
+
+              <motion.div
+                whileHover={reduceMotion ? {} : { y: -3 }}
+                whileTap={reduceMotion ? {} : { scale: 0.97 }}
+              >
+                <Link
+                  href="/history"
+                  className="inline-flex rounded-xl border border-slate-700 px-8 py-4 font-semibold transition hover:border-cyan-400 hover:text-cyan-400"
+                >
+                  View History
+                </Link>
+              </motion.div>
+            </motion.div>
           </div>
-        )}
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-            <p className="text-slate-300 font-medium">
-              Latest ATS Score
-            </p>
-
-            <p className="text-5xl font-bold text-green-400 mt-4">
-              {loading
-                ? "..."
-                : latestScore !== null
-                ? latestScore
-                : "—"}
-              {!loading && latestScore !== null && (
-                <span className="text-lg text-slate-500"> /100</span>
-              )}
-            </p>
-
-            <p className="text-sm text-slate-500 mt-3">
-              Score from your most recent saved analysis
-            </p>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-            <p className="text-slate-300 font-medium">
-              Total Analyses
-            </p>
-
-            <p className="text-5xl font-bold mt-4">
-              {loading ? "..." : totalResumes}
-            </p>
-
-            <p className="text-sm text-slate-500 mt-3">
-              Saved resume analyses in your account
-            </p>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
-            <p className="text-slate-300 font-medium">
-              Best ATS Score
-            </p>
-
-            <p className="text-5xl font-bold text-cyan-400 mt-4">
-              {loading
-                ? "..."
-                : bestScore !== null
-                ? bestScore
-                : "—"}
-              {!loading && bestScore !== null && (
-                <span className="text-lg text-slate-500"> /100</span>
-              )}
-            </p>
-
-            <p className="text-sm text-slate-500 mt-3">
-              Your highest saved ATS score
-            </p>
-          </div>
-        </div>
-
-        {!loading && !error && totalResumes === 0 && (
-          <div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <h2 className="text-xl font-bold">
-              Start your first analysis
-            </h2>
-            <p className="text-slate-400 mt-2">
-              Your dashboard statistics will update after you analyze
-              and save your first resume.
-            </p>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-4 mt-10">
-          <Link
-            href="/upload"
-            className="inline-flex bg-cyan-400 text-slate-950 font-bold px-8 py-4 rounded-xl hover:bg-cyan-300 transition"
-          >
-            Upload Resume
-          </Link>
-
-          <Link
-            href="/history"
-            className="inline-flex border border-slate-700 font-semibold px-8 py-4 rounded-xl hover:border-cyan-400 hover:text-cyan-400 transition"
-          >
-            View History
-          </Link>
-        </div>
-      </div>
-    </main>
+        </main>
+      </PageTransition>
     </AuthGuard>
   );
 }
