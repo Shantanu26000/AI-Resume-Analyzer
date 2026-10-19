@@ -2,50 +2,125 @@
 
 import AuthGuard from "../../components/AuthGuard";
 import PageTransition from "../../components/PageTransition";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion, type Variants } from "framer-motion";
 
+type HistoryItem = {
+  id: number;
+  resume_file?: string;
+  ats_score?: number | string;
+  created_at?: string;
+};
+
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || ""
+).replace(/\/+$/, "");
+
+async function readResponse(response: Response) {
+  const text = await response.text();
+
+  let data: any = {};
+
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        `The server returned HTML or invalid JSON (HTTP ${response.status}). Check NEXT_PUBLIC_API_URL and your backend route.`
+      );
+    }
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      data.message || `Request failed with status ${response.status}`
+    );
+  }
+
+  return data;
+}
+
 export default function HistoryPage() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
 
-  const [history, setHistory] = useState<any[]>([]);
+  const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
-    const fetchHistory = async () => {
+    let cancelled = false;
+
+    async function fetchHistory() {
       const token = localStorage.getItem("token");
 
       if (!token) {
-        router.push("/login");
+        router.replace("/login");
+        return;
+      }
+
+      if (!API_BASE_URL) {
+        setError(
+          "API URL is missing. Set NEXT_PUBLIC_API_URL in your frontend hosting environment."
+        );
+        setLoading(false);
         return;
       }
 
       try {
-        const response = await fetch("process.env.NEXT_PUBLIC_API_URL/api/analysis", {
+        setLoading(true);
+        setError("");
+
+        const response = await fetch(`${API_BASE_URL}/api/analysis`, {
+          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
+            Accept: "application/json",
           },
+          cache: "no-store",
         });
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data.message || "Failed to fetch history");
+        if (response.status === 401) {
+          localStorage.removeItem("token");
+          router.replace("/login");
+          return;
         }
 
-        setHistory(data);
-      } catch (error: any) {
-        alert(error.message || "Something went wrong");
+        const data = await readResponse(response);
+
+        if (cancelled) return;
+
+        const items: HistoryItem[] = Array.isArray(data)
+          ? data
+          : Array.isArray(data.analyses)
+            ? data.analyses
+            : Array.isArray(data.history)
+              ? data.history
+              : [];
+
+        setHistory(items);
+      } catch (err) {
+        if (cancelled) return;
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load your analysis history."
+        );
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
-    };
+    }
 
     fetchHistory();
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   const handleDelete = async (id: number) => {
@@ -60,36 +135,42 @@ export default function HistoryPage() {
     const token = localStorage.getItem("token");
 
     if (!token) {
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
     try {
       setDeletingId(id);
+      setError("");
 
-      const response = await fetch(
-        `process.env.NEXT_PUBLIC_API_URL/api/analysis/${id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/api/analysis/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
+      });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Failed to delete analysis");
+      if (response.status === 401) {
+        localStorage.removeItem("token");
+        router.replace("/login");
+        return;
       }
 
-      setHistory((prev) => prev.filter((item) => item.id !== id));
+      await readResponse(response);
+
+      setHistory((previous) => previous.filter((item) => item.id !== id));
 
       if (localStorage.getItem("selectedAnalysisId") === String(id)) {
         localStorage.removeItem("selectedAnalysisId");
+        localStorage.removeItem("analysis");
       }
-    } catch (error: any) {
-      alert(error.message || "Something went wrong");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to delete this analysis."
+      );
     } finally {
       setDeletingId(null);
     }
@@ -97,17 +178,19 @@ export default function HistoryPage() {
 
   const getScoreStyle = (score: number) => {
     if (score >= 80) {
-      return "bg-green-400/10 text-green-400 border-green-400/20";
+      return "border-green-400/20 bg-green-400/10 text-green-400";
     }
 
     if (score >= 60) {
-      return "bg-yellow-400/10 text-yellow-400 border-yellow-400/20";
+      return "border-yellow-400/20 bg-yellow-400/10 text-yellow-400";
     }
 
-    return "bg-red-400/10 text-red-400 border-red-400/20";
+    return "border-red-400/20 bg-red-400/10 text-red-400";
   };
 
-  const formatDate = (date: string) => {
+  const formatDate = (date?: string) => {
+    if (!date) return "Date unavailable";
+
     const parsed = new Date(date);
 
     if (Number.isNaN(parsed.getTime())) {
@@ -124,13 +207,13 @@ export default function HistoryPage() {
   const itemVariants: Variants = {
     hidden: {
       opacity: 0,
-      y: reduceMotion ? 0 : 18,
+      y: reduceMotion ? 0 : 15,
     },
     visible: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: reduceMotion ? 0 : 0.4,
+        duration: reduceMotion ? 0 : 0.35,
         ease: "easeOut",
       },
     },
@@ -140,40 +223,37 @@ export default function HistoryPage() {
     hidden: {},
     visible: {
       transition: {
-        staggerChildren: reduceMotion ? 0 : 0.08,
+        staggerChildren: reduceMotion ? 0 : 0.06,
       },
     },
   };
 
-  const averageScore = history.length
-    ? Math.round(
-        history.reduce(
-          (sum, item) => sum + (Number(item.ats_score) || 0),
-          0
-        ) / history.length
-      )
-    : null;
+  const averageScore =
+    history.length > 0
+      ? Math.round(
+          history.reduce(
+            (sum, item) => sum + (Number(item.ats_score) || 0),
+            0
+          ) / history.length
+        )
+      : null;
 
-  const bestScore = history.length
-    ? Math.max(...history.map((item) => Number(item.ats_score) || 0))
-    : null;
+  const bestScore =
+    history.length > 0
+      ? Math.max(...history.map((item) => Number(item.ats_score) || 0))
+      : null;
 
   return (
     <AuthGuard>
       <PageTransition>
         <main className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-8 text-white sm:px-8 sm:py-12">
-          {/* Animated background glow */}
           <motion.div
             aria-hidden="true"
             className="pointer-events-none absolute -left-32 top-20 h-80 w-80 rounded-full bg-cyan-500/10 blur-3xl"
             animate={
               reduceMotion
                 ? {}
-                : {
-                    x: [0, 30, 0],
-                    y: [0, 20, 0],
-                    scale: [1, 1.12, 1],
-                  }
+                : { x: [0, 30, 0], y: [0, 20, 0], scale: [1, 1.1, 1] }
             }
             transition={{
               duration: 10,
@@ -188,11 +268,7 @@ export default function HistoryPage() {
             animate={
               reduceMotion
                 ? {}
-                : {
-                    x: [0, -25, 0],
-                    y: [0, -20, 0],
-                    scale: [1, 1.1, 1],
-                  }
+                : { x: [0, -25, 0], y: [0, -20, 0], scale: [1, 1.1, 1] }
             }
             transition={{
               duration: 11,
@@ -202,8 +278,7 @@ export default function HistoryPage() {
           />
 
           <div className="relative mx-auto max-w-6xl">
-            {/* Header */}
-            <motion.div
+            <motion.header
               variants={itemVariants}
               initial="hidden"
               animate="visible"
@@ -229,15 +304,32 @@ export default function HistoryPage() {
               >
                 <Link
                   href="/upload"
-                  className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-6 py-3 font-bold text-slate-950 shadow-lg shadow-cyan-500/10 transition-colors hover:bg-cyan-300"
+                  className="inline-flex items-center justify-center rounded-xl bg-cyan-400 px-6 py-3 font-bold text-slate-950 transition-colors hover:bg-cyan-300"
                 >
                   + Analyze Resume
                 </Link>
               </motion.div>
-            </motion.div>
+            </motion.header>
 
-            {/* Statistics */}
-            {!loading && (
+            {error && (
+              <div
+                role="alert"
+                className="mt-6 rounded-xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300"
+              >
+                <p className="font-semibold">Unable to load history</p>
+                <p className="mt-1 break-words">{error}</p>
+
+                <button
+                  type="button"
+                  onClick={() => window.location.reload()}
+                  className="mt-3 font-semibold underline underline-offset-4 hover:text-white"
+                >
+                  Try again
+                </button>
+              </div>
+            )}
+
+            {!loading && !error && (
               <motion.div
                 variants={listVariants}
                 initial="hidden"
@@ -246,8 +338,8 @@ export default function HistoryPage() {
               >
                 <motion.div
                   variants={itemVariants}
-                  whileHover={reduceMotion ? {} : { y: -5, scale: 1.02 }}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 transition-colors hover:border-cyan-400/40"
+                  whileHover={reduceMotion ? {} : { y: -4 }}
+                  className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5"
                 >
                   <p className="text-sm text-slate-400">Total Analyses</p>
                   <p className="mt-2 text-3xl font-bold">{history.length}</p>
@@ -255,8 +347,8 @@ export default function HistoryPage() {
 
                 <motion.div
                   variants={itemVariants}
-                  whileHover={reduceMotion ? {} : { y: -5, scale: 1.02 }}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 transition-colors hover:border-cyan-400/40"
+                  whileHover={reduceMotion ? {} : { y: -4 }}
+                  className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5"
                 >
                   <p className="text-sm text-slate-400">Best ATS Score</p>
                   <p className="mt-2 text-3xl font-bold text-cyan-400">
@@ -266,8 +358,8 @@ export default function HistoryPage() {
 
                 <motion.div
                   variants={itemVariants}
-                  whileHover={reduceMotion ? {} : { y: -5, scale: 1.02 }}
-                  className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5 transition-colors hover:border-green-400/40"
+                  whileHover={reduceMotion ? {} : { y: -4 }}
+                  className="rounded-2xl border border-slate-800 bg-slate-900/90 p-5"
                 >
                   <p className="text-sm text-slate-400">Average ATS Score</p>
                   <p className="mt-2 text-3xl font-bold text-green-400">
@@ -277,12 +369,10 @@ export default function HistoryPage() {
               </motion.div>
             )}
 
-            {/* History section */}
             <motion.section
               variants={itemVariants}
               initial="hidden"
               animate="visible"
-              transition={{ delay: reduceMotion ? 0 : 0.15 }}
               className="mt-8 overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90"
             >
               <div className="border-b border-slate-800 p-6 sm:p-8">
@@ -293,40 +383,31 @@ export default function HistoryPage() {
               </div>
 
               {loading ? (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="py-20 text-center"
-                >
+                <div className="py-20 text-center">
                   <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-cyan-400 border-t-transparent" />
                   <p className="mt-4 text-slate-400">
                     Loading your history...
                   </p>
-                </motion.div>
+                </div>
+              ) : error ? (
+                <div className="px-6 py-12 text-center text-slate-400">
+                  Check the error message above, then try again.
+                </div>
               ) : history.length === 0 ? (
-                <motion.div
-                  initial={{ opacity: 0, y: reduceMotion ? 0 : 15 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="px-6 py-16 text-center"
-                >
+                <div className="px-6 py-16 text-center">
                   <div className="mb-4 text-4xl">📄</div>
                   <h3 className="text-xl font-bold">No analyses yet</h3>
                   <p className="mt-2 text-slate-400">
                     Upload your first resume to see your results here.
                   </p>
 
-                  <motion.div
-                    whileHover={reduceMotion ? {} : { scale: 1.04, y: -2 }}
-                    whileTap={reduceMotion ? {} : { scale: 0.96 }}
+                  <Link
+                    href="/upload"
+                    className="mt-6 inline-flex rounded-xl bg-cyan-400 px-6 py-3 font-bold text-slate-950 transition-colors hover:bg-cyan-300"
                   >
-                    <Link
-                      href="/upload"
-                      className="mt-6 inline-flex rounded-xl bg-cyan-400 px-6 py-3 font-bold text-slate-950 transition-colors hover:bg-cyan-300"
-                    >
-                      Upload Resume
-                    </Link>
-                  </motion.div>
-                </motion.div>
+                    Upload Resume
+                  </Link>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[760px]">
@@ -352,119 +433,115 @@ export default function HistoryPage() {
                       initial="hidden"
                       animate="visible"
                     >
-                      {history.map((item) => (
-                        <motion.tr
-                          key={item.id}
-                          variants={itemVariants}
-                          whileHover={
-                            reduceMotion ? {} : { backgroundColor: "rgba(30, 41, 59, 0.5)" }
-                          }
-                          className="border-t border-slate-800 transition-colors"
-                        >
-                          <td className="px-6 py-5">
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-400/10 text-sm font-bold text-cyan-400">
-                                PDF
-                              </div>
+                      {history.map((item) => {
+                        const score = Number(item.ats_score) || 0;
 
-                              <div className="min-w-0">
-                                <p
-                                  className="max-w-[260px] truncate font-semibold"
-                                  title={item.resume_file}
+                        return (
+                          <motion.tr
+                            key={item.id}
+                            variants={itemVariants}
+                            whileHover={
+                              reduceMotion
+                                ? {}
+                                : { backgroundColor: "rgba(30, 41, 59, 0.5)" }
+                            }
+                            className="border-t border-slate-800 transition-colors"
+                          >
+                            <td className="px-6 py-5">
+                              <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-400/10 text-sm font-bold text-cyan-400">
+                                  PDF
+                                </div>
+
+                                <div className="min-w-0">
+                                  <p
+                                    className="max-w-[260px] truncate font-semibold"
+                                    title={item.resume_file || "Resume"}
+                                  >
+                                    {item.resume_file || "Resume"}
+                                  </p>
+                                  <p className="mt-1 text-xs text-slate-500">
+                                    Analysis #{item.id}
+                                  </p>
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="px-4 py-5 text-center">
+                              <span
+                                className={`inline-flex items-center rounded-lg border px-3 py-1.5 font-bold ${getScoreStyle(
+                                  score
+                                )}`}
+                              >
+                                {score}/100
+                              </span>
+                            </td>
+
+                            <td className="px-4 py-5 text-center text-sm text-slate-400">
+                              {formatDate(item.created_at)}
+                            </td>
+
+                            <td className="px-6 py-5">
+                              <div className="flex items-center justify-center gap-4">
+                                <motion.button
+                                  type="button"
+                                  whileHover={
+                                    reduceMotion ? {} : { scale: 1.06 }
+                                  }
+                                  whileTap={
+                                    reduceMotion ? {} : { scale: 0.95 }
+                                  }
+                                  onClick={() => {
+                                    localStorage.setItem(
+                                      "selectedAnalysisId",
+                                      String(item.id)
+                                    );
+                                    router.push("/analysis");
+                                  }}
+                                  className="font-semibold text-cyan-400 transition hover:text-cyan-300"
                                 >
-                                  {item.resume_file}
-                                </p>
-                                <p className="mt-1 text-xs text-slate-500">
-                                  Analysis #{item.id}
-                                </p>
+                                  View
+                                </motion.button>
+
+                                <motion.button
+                                  type="button"
+                                  whileHover={
+                                    reduceMotion ? {} : { scale: 1.06 }
+                                  }
+                                  whileTap={
+                                    reduceMotion ? {} : { scale: 0.95 }
+                                  }
+                                  onClick={() => handleDelete(item.id)}
+                                  disabled={deletingId === item.id}
+                                  className="font-semibold text-red-400 transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {deletingId === item.id
+                                    ? "Deleting..."
+                                    : "Delete"}
+                                </motion.button>
                               </div>
-                            </div>
-                          </td>
-
-                          <td className="px-4 py-5 text-center">
-                            <motion.span
-                              whileHover={
-                                reduceMotion ? {} : { scale: 1.08 }
-                              }
-                              className={`inline-flex items-center rounded-lg border px-3 py-1.5 font-bold ${getScoreStyle(
-                                Number(item.ats_score) || 0
-                              )}`}
-                            >
-                              {item.ats_score}/100
-                            </motion.span>
-                          </td>
-
-                          <td className="px-4 py-5 text-center text-sm text-slate-400">
-                            {formatDate(item.created_at)}
-                          </td>
-
-                          <td className="px-6 py-5">
-                            <div className="flex items-center justify-center gap-4">
-                              <motion.button
-                                type="button"
-                                whileHover={
-                                  reduceMotion ? {} : { scale: 1.08, y: -1 }
-                                }
-                                whileTap={
-                                  reduceMotion ? {} : { scale: 0.94 }
-                                }
-                                onClick={() => {
-                                  localStorage.setItem(
-                                    "selectedAnalysisId",
-                                    String(item.id)
-                                  );
-                                  router.push("/analysis");
-                                }}
-                                className="font-semibold text-cyan-400 transition hover:text-cyan-300"
-                              >
-                                View
-                              </motion.button>
-
-                              <motion.button
-                                type="button"
-                                whileHover={
-                                  reduceMotion ? {} : { scale: 1.08, y: -1 }
-                                }
-                                whileTap={
-                                  reduceMotion ? {} : { scale: 0.94 }
-                                }
-                                onClick={() => handleDelete(item.id)}
-                                disabled={deletingId === item.id}
-                                className="font-semibold text-red-400 transition hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                {deletingId === item.id
-                                  ? "Deleting..."
-                                  : "Delete"}
-                              </motion.button>
-                            </div>
-                          </td>
-                        </motion.tr>
-                      ))}
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
                     </motion.tbody>
                   </table>
                 </div>
               )}
             </motion.section>
 
-            {/* Back to dashboard */}
             <motion.div
               initial={{ opacity: 0, y: reduceMotion ? 0 : 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: reduceMotion ? 0 : 0.25 }}
+              transition={{ delay: reduceMotion ? 0 : 0.2 }}
               className="mt-8"
             >
-              <motion.div
-                whileHover={reduceMotion ? {} : { x: -3 }}
-                whileTap={reduceMotion ? {} : { scale: 0.97 }}
-                className="inline-flex"
+              <Link
+                href="/dashboard"
+                className="inline-flex rounded-xl border border-slate-700 px-6 py-3 font-semibold transition-colors hover:border-cyan-400 hover:text-cyan-400"
               >
-                <Link
-                  href="/dashboard"
-                  className="inline-flex rounded-xl border border-slate-700 px-6 py-3 font-semibold transition-colors hover:border-cyan-400 hover:text-cyan-400"
-                >
-                  ← Back to Dashboard
-                </Link>
-              </motion.div>
+                ← Back to Dashboard
+              </Link>
             </motion.div>
           </div>
         </main>
