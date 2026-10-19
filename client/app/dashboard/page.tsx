@@ -44,10 +44,10 @@ export default function Dashboard() {
 
       try {
         const [analysisResponse, profileResponse] = await Promise.all([
-          fetch("process.env.NEXT_PUBLIC_API_URL/api/analysis", {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/analysis`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          fetch("process.env.NEXT_PUBLIC_API_URL/api/profile", {
+         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/profile`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
         ]);

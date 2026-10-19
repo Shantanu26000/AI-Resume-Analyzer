@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,13 +9,14 @@ export default function UploadPage() {
   const [loading, setLoading] = useState(false);
 
   const router = useRouter();
-  useEffect(() => {
-  const token = localStorage.getItem("token");
 
-  if (!token) {
-    router.push("/login");
-  }
-}, [router]);
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+
+    if (!token) {
+      router.replace("/login");
+    }
+  }, [router]);
 
   const handleUpload = async () => {
     if (!file) {
@@ -23,132 +25,133 @@ export default function UploadPage() {
     }
 
     if (file.type !== "application/pdf") {
-  alert("Only PDF files are allowed");
-  return;
-}
+      alert("Only PDF files are allowed");
+      return;
+    }
 
-if (file.size > 5 * 1024 * 1024) {
-  alert("File too large. Maximum size is 5 MB");
-  return;
-}
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File too large. Maximum size is 5 MB");
+      return;
+    }
 
     const token = localStorage.getItem("token");
 
     if (!token) {
       alert("Please login first");
-      router.push("/login");
+      router.replace("/login");
       return;
     }
 
+    if (loading) return;
+
+    setLoading(true);
+
     try {
-      setLoading(true);
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL?.replace(/\/+$/, "");
+
+      if (!apiUrl) {
+        throw new Error(
+          "API URL is missing. Check NEXT_PUBLIC_API_URL in your deployment settings."
+        );
+      }
 
       const formData = new FormData();
       formData.append("resume", file);
 
       // Upload PDF
-      const uploadRes = await fetch(
-        "process.env.NEXT_PUBLIC_API_URL/api/upload",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-          body: formData,
-        }
-      );
+      const uploadRes = await fetch(`${apiUrl}/api/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
 
       const uploadData = await uploadRes.json();
 
-if (!uploadRes.ok) {
-  if (uploadRes.status === 401) {
-    localStorage.removeItem("token");
-    alert("Session expired. Please login again.");
-    router.push("/login");
-    return;
-  }
+      if (!uploadRes.ok) {
+        if (uploadRes.status === 401) {
+          localStorage.removeItem("token");
+          alert("Session expired. Please login again.");
+          router.replace("/login");
+          return;
+        }
 
-  throw new Error(uploadData.message || "Upload failed");
-}
+        throw new Error(uploadData.message || "Upload failed");
+      }
+
+      if (!uploadData.file) {
+        throw new Error("Upload succeeded, but the server did not return a file reference.");
+      }
 
       // Analyze PDF
-      const analyzeRes = await fetch(
-        "process.env.NEXT_PUBLIC_API_URL/api/analyze",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            file: uploadData.file,
-          }),
-        }
-      );
+      const analyzeRes = await fetch(`${apiUrl}/api/analyze`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          file: uploadData.file,
+        }),
+      });
 
       const analysis = await analyzeRes.json();
 
-if (!analyzeRes.ok) {
-  if (analyzeRes.status === 401) {
-    localStorage.removeItem("token");
-    alert("Session expired. Please login again.");
-    router.push("/login");
-    return;
-  }
+      if (!analyzeRes.ok) {
+        if (analyzeRes.status === 401) {
+          localStorage.removeItem("token");
+          alert("Session expired. Please login again.");
+          router.replace("/login");
+          return;
+        }
 
-  throw new Error(analysis.message || "Analysis failed");
-}
+        throw new Error(analysis.message || "Analysis failed");
+      }
 
-localStorage.setItem(
-  "analysis",
-  JSON.stringify(analysis)
-);
+      localStorage.setItem("analysis", JSON.stringify(analysis));
+      localStorage.removeItem("selectedAnalysisId");
+      localStorage.setItem("resumeFile", uploadData.file);
 
-localStorage.removeItem("selectedAnalysisId");
+      router.push("/analysis");
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Something went wrong. Please try again.";
 
-localStorage.setItem(
-  "resumeFile",
-  uploadData.file
-);
-
-router.push("/analysis");
-
-    } catch (error: any) {
-      alert(error.message || "Something went wrong");
+      alert(message);
+    } finally {
       setLoading(false);
     }
   };
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white flex items-center justify-center px-4">
-
-      <div className="bg-slate-900 p-10 rounded-3xl w-full max-w-xl shadow-2xl">
-
-        <h1 className="text-3xl font-bold text-center">
+    <main className="flex min-h-screen items-center justify-center bg-slate-950 px-4 text-white">
+      <div className="w-full max-w-xl rounded-3xl bg-slate-900 p-10 shadow-2xl">
+        <h1 className="text-center text-3xl font-bold">
           Upload Resume
         </h1>
 
-        <p className="text-center text-slate-400 mt-2">
+        <p className="mt-2 text-center text-slate-400">
           Upload your PDF and let AI analyze your resume
         </p>
 
         {/* File Selection */}
         <div className="mt-10">
-
           <label
             htmlFor="resume-upload"
-            className="block w-full cursor-pointer rounded-2xl border-2 border-dashed border-slate-600 bg-slate-800 p-8 text-center hover:border-cyan-400 hover:bg-slate-750 transition-all duration-200"
+            className="block w-full cursor-pointer rounded-2xl border-2 border-dashed border-slate-600 bg-slate-800 p-8 text-center transition-all duration-200 hover:border-cyan-400 hover:bg-slate-700"
           >
-
             <p className="text-lg font-semibold">
               Select your resume
             </p>
 
-            <p className="text-slate-400 mt-2">
-              PDF files only
+            <p className="mt-2 text-slate-400">
+              PDF files only (maximum 5 MB)
             </p>
 
-            <span className="inline-block mt-5 bg-cyan-500 text-black px-6 py-3 rounded-xl font-bold hover:bg-cyan-400 transition">
+            <span className="mt-5 inline-block rounded-xl bg-cyan-500 px-6 py-3 font-bold text-black transition hover:bg-cyan-400">
               Browse from PC
             </span>
 
@@ -161,21 +164,19 @@ router.push("/analysis");
                 setFile(e.target.files?.[0] || null)
               }
             />
-
           </label>
 
           {file && (
-            <div className="mt-4 bg-slate-800 rounded-xl p-4 text-center">
-              <p className="text-green-400 font-semibold">
+            <div className="mt-4 rounded-xl bg-slate-800 p-4 text-center">
+              <p className="font-semibold text-green-400">
                 ✓ Resume selected
               </p>
 
-              <p className="text-slate-300 text-sm mt-1 break-all">
+              <p className="mt-1 break-all text-sm text-slate-300">
                 {file.name}
               </p>
             </div>
           )}
-
         </div>
 
         {/* Upload & Analyze Button */}
@@ -183,17 +184,15 @@ router.push("/analysis");
           type="button"
           onClick={handleUpload}
           disabled={loading}
-          className={`mt-8 w-full py-4 rounded-xl font-bold text-lg transition-all duration-200
-            ${
-              loading
-                ? "bg-slate-600 text-slate-300 cursor-not-allowed"
-                : "bg-cyan-500 text-black hover:bg-cyan-400 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
-            }
-          `}
+          className={`mt-8 w-full rounded-xl py-4 text-lg font-bold transition-all duration-200 ${
+            loading
+              ? "cursor-not-allowed bg-slate-600 text-slate-300"
+              : "cursor-pointer bg-cyan-500 text-black hover:scale-[1.02] hover:bg-cyan-400 active:scale-[0.98]"
+          }`}
         >
           {loading ? (
             <span className="flex items-center justify-center gap-3">
-              <span className="w-5 h-5 border-2 border-slate-300 border-t-transparent rounded-full animate-spin"></span>
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-transparent" />
               Analyzing Resume...
             </span>
           ) : (
@@ -202,13 +201,11 @@ router.push("/analysis");
         </button>
 
         {loading && (
-          <p className="text-center text-slate-400 text-sm mt-4">
+          <p className="mt-4 text-center text-sm text-slate-400">
             Uploading your resume and generating AI analysis. Please wait...
           </p>
         )}
-
       </div>
-
     </main>
   );
 }
