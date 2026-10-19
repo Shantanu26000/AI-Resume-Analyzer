@@ -111,7 +111,7 @@ export default function AnalysisPage() {
 
           const response = await fetch(
 
-            `process.env.NEXT_PUBLIC_API_URL/api/analysis/${selectedId}`,
+`${process.env.NEXT_PUBLIC_API_URL}/api/analysis/${selectedId}`,
 
             {
 
