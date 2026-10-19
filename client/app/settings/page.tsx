@@ -7,6 +7,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://ai-resume-analyzer-production-c6b4.up.railway.app"
+).replace(/\/+$/, "");
+
 export default function SettingsPage() {
   const router = useRouter();
   const reduceMotion = useReducedMotion();
@@ -28,7 +33,8 @@ export default function SettingsPage() {
       }
 
       try {
-        const response = await fetch("process.env.NEXT_PUBLIC_API_URL/api/profile", {
+        const response = await fetch(`${API_BASE_URL}/api/profile`, {
+          method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -46,9 +52,9 @@ export default function SettingsPage() {
           throw new Error(data.message || "Failed to load profile");
         }
 
-        setName(data.name);
-        setEmail(data.email);
-      } catch (err) {
+        setName(data.name ?? "");
+        setEmail(data.email ?? "");
+      } catch (err: unknown) {
         setError(
           err instanceof Error ? err.message : "Something went wrong"
         );
@@ -75,7 +81,7 @@ export default function SettingsPage() {
     try {
       setSaving(true);
 
-      const response = await fetch("process.env.NEXT_PUBLIC_API_URL/api/profile", {
+      const response = await fetch(`${API_BASE_URL}/api/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -96,10 +102,10 @@ export default function SettingsPage() {
         throw new Error(data.message || "Failed to save changes");
       }
 
-      setName(data.name);
-      setEmail(data.email);
+      setName(data.name ?? name);
+      setEmail(data.email ?? email);
       setMessage("Profile updated successfully!");
-    } catch (err) {
+    } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "Something went wrong"
       );
@@ -184,7 +190,11 @@ export default function SettingsPage() {
                 duration: reduceMotion ? 0 : 0.55,
                 ease: "easeOut",
               }}
-              whileHover={reduceMotion ? {} : { borderColor: "rgba(34, 211, 238, 0.25)" }}
+              whileHover={
+                reduceMotion
+                  ? {}
+                  : { borderColor: "rgba(34, 211, 238, 0.25)" }
+              }
               className="mt-10 rounded-2xl border border-slate-800 bg-slate-900/90 p-6 shadow-2xl shadow-cyan-950/10 backdrop-blur-xl sm:p-8"
             >
               <h2 className="mb-2 text-xl font-bold">
